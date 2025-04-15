@@ -515,6 +515,8 @@ struct fuse_loop_config_v1 {
  */
 #define FUSE_CAP_NO_EXPORT_SUPPORT (1 << 30)
 
+#define FUSE_CAP_EXTFUSE (1 << 31)
+
 /**
  * Ioctl flags
  *
@@ -703,10 +705,13 @@ struct fuse_conn_info {
 	 */
 	uint64_t want_ext;
 
+	/* ExtFUSE prog */
+	unsigned extfuse_prog_fd;
+
 	/**
 	 * For future use.
 	 */
-	uint32_t reserved[16];
+	uint32_t reserved[15];
 };
 fuse_static_assert(sizeof(struct fuse_conn_info) == 128,
 		   "Size of struct fuse_conn_info must be 128 bytes");

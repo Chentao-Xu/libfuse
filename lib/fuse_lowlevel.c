@@ -2149,6 +2149,8 @@ void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 			se->conn.capable_ext |= FUSE_CAP_PASSTHROUGH;
 		if (inargflags & FUSE_NO_EXPORT_SUPPORT)
 			se->conn.capable_ext |= FUSE_CAP_NO_EXPORT_SUPPORT;
+		if (inargflags & FUSE_FS_EXTFUSE)
+			se->conn.capable_ext |= FUSE_CAP_EXTFUSE;
 	} else {
 		se->conn.max_readahead = 0;
 	}
@@ -2314,6 +2316,8 @@ void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	}
 	if (se->conn.want_ext & FUSE_CAP_NO_EXPORT_SUPPORT)
 		outargflags |= FUSE_NO_EXPORT_SUPPORT;
+	if (se->conn.want & FUSE_CAP_EXTFUSE)
+		outargflags |= FUSE_FS_EXTFUSE;
 
 	if (inargflags & FUSE_INIT_EXT) {
 		outargflags |= FUSE_INIT_EXT;
