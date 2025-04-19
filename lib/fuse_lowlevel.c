@@ -2316,8 +2316,10 @@ void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	}
 	if (se->conn.want_ext & FUSE_CAP_NO_EXPORT_SUPPORT)
 		outargflags |= FUSE_NO_EXPORT_SUPPORT;
-	if (se->conn.want & FUSE_CAP_EXTFUSE)
+	if (se->conn.want_ext & FUSE_CAP_EXTFUSE) {
 		outargflags |= FUSE_FS_EXTFUSE;
+		outarg.extfuse_prog_fd = se->conn.extfuse_prog_fd;
+	}
 
 	if (inargflags & FUSE_INIT_EXT) {
 		outargflags |= FUSE_INIT_EXT;

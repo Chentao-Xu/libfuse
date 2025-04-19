@@ -226,6 +226,8 @@ static void sfs_init(void *userdata, fuse_conn_info *conn) {
      */
     fuse_set_feature_flag(conn, FUSE_CAP_NO_EXPORT_SUPPORT);
 
+    fuse_set_feature_flag(conn, FUSE_CAP_EXTFUSE);
+
     /* Disable the receiving and processing of FUSE_INTERRUPT requests */
     conn->no_interrupt = 1;
 
