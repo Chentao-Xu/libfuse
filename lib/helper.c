@@ -318,7 +318,7 @@ int fuse_main_real_versioned(int argc, char *argv[],
 		return 1;
 
 	if (opts.show_version) {
-		printf("FUSE library version %s\n", PACKAGE_VERSION);
+		printf("FUSE library versiona %s\n", PACKAGE_VERSION);
 		fuse_lowlevel_version();
 		res = 0;
 		goto out1;

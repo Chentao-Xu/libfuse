@@ -8,22 +8,56 @@
 
 #include "fuse.h"
 #include "fuse_lowlevel.h"
+#include "rfuse.h"
 #include "util.h"
 
 #include <stdint.h>
 #include <stdbool.h>
 #include <errno.h>
 
-#define MIN(a, b) \
-({									\
-	typeof(a) _a = (a);						\
-	typeof(b) _b = (b);						\
-	_a < _b ? _a : _b;						\
-})
+#define MIN(a, b)           \
+	({                      \
+		typeof(a) _a = (a); \
+		typeof(b) _b = (b); \
+		_a < _b ? _a : _b;  \
+	})
 
 struct mount_opts;
 
-struct fuse_req {
+struct rfuse_user_req
+{
+	struct fuse_session *se;
+	int ctr;
+	struct fuse_ctx ctx;
+	uint64_t unique;  // It's not necessary, but for forget requests
+	uint64_t nlookup; // Used only for forget requests
+	uint32_t index;	  // index of "rfuse_req" in request buffer
+	pthread_mutex_t lock;
+	struct fuse_chan *ch;
+	int interrupted;
+	unsigned int ioctl_64bit : 1;
+	union
+	{
+		struct
+		{
+			uint64_t unique;
+		} i;
+		struct
+		{
+			fuse_interrupt_func_t func;
+			void *data;
+		} ni;
+	} u;
+	// All rfuse_user_req should know about where the kernel fuse request came from
+	int riq_id;
+	struct rfuse_iqueue *riq;
+	struct rfuse_user_req *next;
+	struct rfuse_user_req *prev;
+	struct rfuse_worker *w;
+};
+
+struct fuse_req
+{
 	struct fuse_session *se;
 	uint64_t unique;
 	_Atomic int ref_cnt;
@@ -32,11 +66,14 @@ struct fuse_req {
 	struct fuse_chan *ch;
 	int interrupted;
 	unsigned int ioctl_64bit : 1;
-	union {
-		struct {
+	union
+	{
+		struct
+		{
 			uint64_t unique;
 		} i;
-		struct {
+		struct
+		{
 			fuse_interrupt_func_t func;
 			void *data;
 		} ni;
@@ -45,18 +82,21 @@ struct fuse_req {
 	struct fuse_req *prev;
 };
 
-struct fuse_notify_req {
+struct fuse_notify_req
+{
 	uint64_t unique;
-	void (*reply)(struct fuse_notify_req *, fuse_req_t, fuse_ino_t,
-		      const void *, const struct fuse_buf *);
+	void (*reply)(struct fuse_notify_req *, old_fuse_req_t, fuse_ino_t,
+				  const void *, const struct fuse_buf *);
 	struct fuse_notify_req *next;
 	struct fuse_notify_req *prev;
 };
 
-struct fuse_session {
+struct fuse_session
+{
 	char *mountpoint;
 	volatile int exited;
 	int fd;
+	struct rfuse_iqueue **riq;
 	struct fuse_custom_io *io;
 	struct mount_opts *mo;
 	int debug;
@@ -68,8 +108,10 @@ struct fuse_session {
 	uid_t owner;
 	struct fuse_conn_info conn;
 	struct fuse_req list;
+	struct rfuse_user_req *rfuse_list;
 	struct fuse_req interrupts;
 	pthread_mutex_t lock;
+	pthread_mutex_t *riq_lock;
 	int got_destroy;
 	pthread_key_t pipe_key;
 	int broken_splice_nonblock;
@@ -87,7 +129,8 @@ struct fuse_session {
 	bool buf_reallocable;
 };
 
-struct fuse_chan {
+struct fuse_chan
+{
 	pthread_mutex_t lock;
 	int ctr;
 	int fd;
@@ -100,7 +143,8 @@ struct fuse_chan {
  * macro.
  *
  */
-struct fuse_module {
+struct fuse_module
+{
 	char *name;
 	fuse_module_factory_t factory;
 	struct fuse_module *next;
@@ -185,27 +229,33 @@ unsigned get_max_read(struct mount_opts *o);
 void fuse_kern_unmount(const char *mountpoint, int fd);
 int fuse_kern_mount(const char *mountpoint, struct mount_opts *mo);
 
-int fuse_send_reply_iov_nofree(fuse_req_t req, int error, struct iovec *iov,
-			       int count);
-void fuse_free_req(fuse_req_t req);
+int fuse_send_reply_iov_nofree(old_fuse_req_t req, int error, struct iovec *iov,
+							   int count);
+void fuse_free_req(old_fuse_req_t req);
 
-void cuse_lowlevel_init(fuse_req_t req, fuse_ino_t nodeide, const void *inarg);
+void cuse_lowlevel_init(old_fuse_req_t req, fuse_ino_t nodeide, const void *inarg);
 
 int fuse_start_thread(pthread_t *thread_id, void *(*func)(void *), void *arg);
 
 void fuse_buf_free(struct fuse_buf *buf);
 
 int fuse_session_receive_buf_internal(struct fuse_session *se,
-				      struct fuse_buf *buf,
-				      struct fuse_chan *ch);
+									  struct fuse_buf *buf,
+									  struct fuse_chan *ch);
 void fuse_session_process_buf_internal(struct fuse_session *se,
-				       const struct fuse_buf *buf,
-				       struct fuse_chan *ch);
+									   const struct fuse_buf *buf,
+									   struct fuse_chan *ch);
 
 struct fuse *fuse_new_31(struct fuse_args *args, const struct fuse_operations *op,
-		      size_t op_size, void *private_data);
+						 size_t op_size, void *private_data);
 int fuse_loop_mt_312(struct fuse *f, struct fuse_loop_config *config);
-int fuse_session_loop_mt_312(struct fuse_session *se, struct fuse_loop_config *config);
+int old_fuse_session_loop_mt_312(struct fuse_session *se, struct fuse_loop_config *config);
+bool rfuse_read_queue(struct rfuse_worker *w, struct rfuse_mt *mt, struct fuse_chan *ch, int forget);
+
+struct fuse_chan *rfuse_chan_get(struct fuse_chan *ch);
+void rfuse_chan_put(struct fuse_chan *ch);
+int rfuse_start_thread(pthread_t *thread_id, void *(*func)(void *), void *arg);
+int rfuse_loop_start_thread(struct rfuse_mt *mt);
 
 /**
  * Internal verifier for the given config.
@@ -213,7 +263,6 @@ int fuse_session_loop_mt_312(struct fuse_session *se, struct fuse_loop_config *c
  * @return negative standard error code or 0 on success
  */
 int fuse_loop_cfg_verify(struct fuse_loop_config *config);
-
 
 /*
  * This can be changed dynamically on recent kernels through the
@@ -231,8 +280,8 @@ int fuse_loop_cfg_verify(struct fuse_loop_config *config);
  * Get the wanted capability flags, converting from old format if necessary
  */
 static inline int convert_to_conn_want_ext(struct fuse_conn_info *conn,
-					   uint64_t want_ext_default,
-					   uint32_t want_default)
+										   uint64_t want_ext_default,
+										   uint32_t want_default)
 {
 	/*
 	 * Convert want to want_ext if necessary.
@@ -244,16 +293,18 @@ static inline int convert_to_conn_want_ext(struct fuse_conn_info *conn,
 	 * already set to the value of want.
 	 */
 	if (conn->want != want_default &&
-	    fuse_lower_32_bits(conn->want_ext) != conn->want) {
-		if (conn->want_ext != want_ext_default) {
+		fuse_lower_32_bits(conn->want_ext) != conn->want)
+	{
+		if (conn->want_ext != want_ext_default)
+		{
 			fuse_log(FUSE_LOG_ERR,
-				 "fuse: both 'want' and 'want_ext' are set\n");
+					 "fuse: both 'want' and 'want_ext' are set\n");
 			return -EINVAL;
 		}
 
 		/* high bits from want_ext, low bits from want */
 		conn->want_ext = fuse_higher_32_bits(conn->want_ext) |
-				 conn->want;
+						 conn->want;
 	}
 
 	return 0;

@@ -1,5 +1,5 @@
 libfuse_sources = ['fuse.c', 'fuse_i.h', 'fuse_loop.c', 'fuse_loop_mt.c',
-                   'fuse_lowlevel.c', 'fuse_misc.h', 'fuse_opt.c',
+                   'fuse_lowlevel.c', 'fuse_misc.h', 'fuse_opt.c','rfuse_loop.c', 'rfuse_loop_mt.c', 'rfuse_lowlevel.c',
                    'fuse_signals.c', 'buffer.c', 'cuse_lowlevel.c',
                    'helper.c', 'modules/subdir.c', 'mount_util.c',
                    'fuse_log.c', 'compat.c', 'util.c', 'util.h' ]

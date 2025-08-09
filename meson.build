@@ -1,5 +1,5 @@
 project('libfuse3', ['c'],
-        version: '3.18.0-rc0',  # Version with RC suffix
+        version: '3.17.0',  # Version with RC suffix'3.18.0-rc0'
         meson_version: '>= 0.51.0',
         default_options: [
             'buildtype=debugoptimized',
@@ -238,9 +238,9 @@ if get_option('utils') and not platform.endswith('bsd') and platform != 'dragonf
   subdirs += [ 'util', 'doc' ]
 endif
 
-if get_option('examples')
-  subdirs += 'example'
-endif
+#if get_option('examples')
+#  subdirs += 'example'
+#endif!!!
 
 if get_option('tests')
   subdirs += 'test'

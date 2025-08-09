@@ -4,19 +4,19 @@ FUSE_3.0 {
 		fuse_exit;
 		fuse_loop;
 		fuse_loop_mt;
-		fuse_reply_attr;
-		fuse_reply_buf;
-		fuse_reply_entry;
-		fuse_reply_err;
-		fuse_reply_none;
-		fuse_reply_readlink;
-		fuse_reply_write;
-		fuse_reply_xattr;
-		fuse_req_userdata;
+		old_fuse_reply_attr;
+		old_fuse_reply_buf;
+		old_fuse_reply_entry;
+		old_fuse_reply_err;
+		old_fuse_reply_none;
+		old_fuse_reply_readlink;
+		old_fuse_reply_write;
+		old_fuse_reply_xattr;
+		old_fuse_req_userdata;
 		fuse_session_destroy;
 		fuse_session_exit;
 		fuse_session_exited;
-		fuse_session_loop;
+		old_fuse_session_loop;
 		fuse_session_loop_mt;
 		fuse_session_reset;
 		fuse_session_fd;
@@ -27,11 +27,11 @@ FUSE_3.0 {
 		fuse_opt_match;
 		fuse_parse_cmdline;
 		fuse_remove_signal_handlers;
-		fuse_reply_create;
-		fuse_reply_open;
-		fuse_reply_statfs;
+		old_fuse_reply_create;
+		old_fuse_reply_open;
+		old_fuse_reply_statfs;
 		fuse_set_signal_handlers;
-		fuse_add_direntry;
+		old_fuse_add_direntry;
 		fuse_add_direntry_plus;
 		fuse_daemonize;
 		fuse_get_session;
@@ -43,9 +43,9 @@ FUSE_3.0 {
 		fuse_session_mount;
 		fuse_new;
 		fuse_opt_insert_arg;
-		fuse_reply_lock;
-		fuse_req_interrupt_func;
-		fuse_req_interrupted;
+		old_fuse_reply_lock;
+		old_fuse_req_interrupt_func1;
+		old_fuse_req_interrupted;
 		fuse_unmount;
 		fuse_session_unmount;
 		fuse_fs_access;
@@ -86,7 +86,7 @@ FUSE_3.0 {
 		fuse_reply_iov;
 		fuse_version;
 		fuse_pkgversion;
-		fuse_reply_bmap;
+		old_fuse_reply_bmap;
 		cuse_lowlevel_new;
 		cuse_lowlevel_main;
 		cuse_lowlevel_setup;
@@ -104,16 +104,16 @@ FUSE_3.0 {
 		fuse_reply_ioctl;
 		fuse_reply_ioctl_iov;
 		fuse_reply_ioctl_retry;
-		fuse_reply_poll;
-		fuse_req_ctx;
-		fuse_req_getgroups;
+		old_fuse_reply_poll;
+		old_fuse_req_ctx;
+		old_fuse_req_getgroups;
 		fuse_buf_copy;
 		fuse_buf_size;
 		fuse_fs_read_buf;
 		fuse_fs_write_buf;
 		fuse_lowlevel_notify_retrieve;
 		fuse_lowlevel_notify_store;
-		fuse_reply_data;
+		old_fuse_reply_data;
 		fuse_session_process_buf;
 		fuse_session_receive_buf;
 		fuse_start_cleanup_thread;
@@ -129,6 +129,33 @@ FUSE_3.0 {
 		fuse_parse_conn_info_opts;
 		fuse_fs_lseek;
 		fuse_reply_lseek;
+
+		fuse_reply_attr;
+		fuse_reply_xattr;
+		fuse_reply_readlink;
+		fuse_reply_buf;
+		fuse_reply_create;
+		fuse_reply_open;
+		fuse_reply_err;
+		fuse_reply_none;
+		fuse_reply_statfs;
+		fuse_req_userdata;
+		fuse_reply_entry;
+		fuse_reply_write;
+		fuse_reply_data;
+		fuse_add_direntry;
+		fuse_session_loop;
+		fuse_session_loop_mt_31;
+		fuse_session_loop_mt_32;
+		rfuse_session_loop_mt_mriq;
+
+#!!!
+		rfuse_list_init_req;
+		fuse_req_ctx;
+		fuse_add_direntry_plus;
+		fuse_reply_entry;
+		fuse_add_direntry;
+		fuse_req_interrupt_func;
 
 	local:
 		*;
@@ -171,10 +198,10 @@ FUSE_3.7 {
 FUSE_3.12 {
 	global:
 		fuse_session_loop_mt;
-		fuse_session_loop_mt_312;
+		old_fuse_session_loop_mt_312;
 		fuse_loop_mt;
 		fuse_loop_mt_32;
-		fuse_loop_mt_312;
+		old_fuse_loop_mt_312;
 		fuse_loop_cfg_create;
 		fuse_loop_cfg_destroy;
 		fuse_loop_cfg_set_idle_threads;
