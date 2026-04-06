@@ -15,6 +15,7 @@
 #include <semaphore.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <time.h>
 #include <sys/ioctl.h>
 #include <assert.h>
 #include <stdatomic.h>
@@ -79,6 +80,34 @@ static void rfuse_list_del_worker(struct rfuse_worker *w)
 	struct rfuse_worker *next = w->next;
 	prev->next = next;
 	next->prev = prev;
+}
+
+static int rfuse_sem_timedwait_ms(sem_t *sem, long timeout_ms)
+{
+	struct timespec ts;
+
+	if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+		return -1;
+
+	ts.tv_sec += timeout_ms / 1000;
+	ts.tv_nsec += (timeout_ms % 1000) * 1000000L;
+	if (ts.tv_nsec >= 1000000000L) {
+		ts.tv_sec += ts.tv_nsec / 1000000000L;
+		ts.tv_nsec %= 1000000000L;
+	}
+
+	return sem_timedwait(sem, &ts);
+}
+
+static void rfuse_cancel_all_workers(struct rfuse_mt *mt)
+{
+	struct rfuse_worker *w;
+
+	pthread_mutex_lock(&mt->lock);
+	mt->exit = 1;
+	for (w = mt->main.next; w != &mt->main; w = w->next)
+		pthread_cancel(w->thread_id);
+	pthread_mutex_unlock(&mt->lock);
 }
 
 static void *rfuse_do_work(void *data)
@@ -149,9 +178,27 @@ static void *rfuse_do_work(void *data)
 				int req_index;
 			} args = { .riq_id = mt->riq_id, .req_index = -1 };
 			int res = ioctl(mt->se->fd, RFUSE_DAEMON_SLEEP, &args);
-			if (res == -ENOTCONN) {
-				printf("rfuse: User-level daemon lost connection, exit\n");
-				return NULL;
+			if (res == -1) {
+				if (errno == EINTR) {
+					if (fuse_session_exited(mt->se)) {
+						sem_post(&mt->finish);
+						return NULL;
+					}
+					continue;
+				}
+				if (errno == ENOTCONN) {
+					printf("rfuse: User-level daemon lost connection, exit\n");
+					fuse_session_exit(mt->se);
+					sem_post(&mt->finish);
+					return NULL;
+				}
+				if (fuse_session_exited(mt->se)) {
+					sem_post(&mt->finish);
+					return NULL;
+				}
+				fuse_log(FUSE_LOG_ERR,
+					 "rfuse: daemon sleep ioctl failed on riq_id=%d: %s\n",
+					 mt->riq_id, strerror(errno));
 			}
 			continue;
 		} 
@@ -286,7 +333,6 @@ void *rfuse_session_loop_mt_mriq(void *data)
 {
 	int err;
 	struct rfuse_mt mt;
-	struct rfuse_worker *w;
 
 	struct rfuse_loop_args *args = (struct rfuse_loop_args *)data; 
 	int riq_id = args->riq_id;
@@ -319,15 +365,21 @@ void *rfuse_session_loop_mt_mriq(void *data)
 	printf("ffff%d:\n",err);
 	pthread_mutex_unlock(&mt.lock);
 	if (!err) {
-		/* sem_wait() is interruptible */
-		while (!fuse_session_exited(se))
-			sem_wait(&mt.finish);
+		while (!fuse_session_exited(se)) {
+			int wait_res = rfuse_sem_timedwait_ms(&mt.finish, 200);
 
-		pthread_mutex_lock(&mt.lock);
-		for (w = mt.main.next; w != &mt.main; w = w->next)
-			pthread_cancel(w->thread_id);
-		mt.exit = 1;
-		pthread_mutex_unlock(&mt.lock);
+			if (wait_res == 0)
+				break;
+			if (errno == ETIMEDOUT || errno == EINTR)
+				continue;
+
+			fuse_log(FUSE_LOG_ERR,
+				 "rfuse: sem_timedwait failed for riq_id=%d: %s\n",
+				 mt.riq_id, strerror(errno));
+			break;
+		}
+
+		rfuse_cancel_all_workers(&mt);
 
 		while (mt.main.next != &mt.main)
 			rfuse_join_worker(&mt, mt.main.next);
